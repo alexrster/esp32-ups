@@ -9,6 +9,7 @@
 #define INT_LED                       15
 
 #define BATTERY_VOLTAGE_UPDATE_MS     5000
+#define BATTERY_VOLTAGE_READ_MS       500
 
 #define AC_DETECTOR_PIN               4
 #define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
@@ -30,8 +31,10 @@ typedef enum : uint8_t {
 
 unsigned long 
   now = 0,
+  last = 0,
   lastAcValue = 0,
   lastBatteryVoltageReadMs = 0,
+  lastBatteryVoltageUpdateMs = 0,
   lastModeChangeMs = 0,
   zc = 0;
 
@@ -124,10 +127,14 @@ void ac_loop() {
 }
 
 void battery_voltage_loop() {
-  if (now - lastBatteryVoltageReadMs > BATTERY_VOLTAGE_UPDATE_MS) {
+  if (now - lastBatteryVoltageReadMs > BATTERY_VOLTAGE_READ_MS) {
     lastBatteryVoltageReadMs = now;
+    batteryLevel = (batteryLevel + analogRead(BATTERY_VOLTAGE_PIN)) / 2;
+  }
 
-    batteryLevel = analogRead(BATTERY_VOLTAGE_PIN);
+  if (now - lastBatteryVoltageUpdateMs > BATTERY_VOLTAGE_UPDATE_MS) {
+    lastBatteryVoltageUpdateMs = now;
+
     pubSubClient.publish(MQTT_TOPIC_PREFIX "/battery/raw", String(batteryLevel).c_str());
     pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", current_mode == LINE ? "line" : "battery");
   }
@@ -146,5 +153,6 @@ void loop() {
     }
   }
 
+  last = now;
   delay(1);
 }
