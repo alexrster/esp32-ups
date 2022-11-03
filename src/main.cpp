@@ -91,11 +91,11 @@ void onLineOff() {
   batteryChargerActive = false;
 
   digitalWrite(INT_LED, HIGH);
-  digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
   digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
 
-  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", "0");
   pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
+
+  set_battery_charger(false);
 }
 
 void onLineOn() {
@@ -104,7 +104,6 @@ void onLineOn() {
   lastModeChangeMs = now;
 
   digitalWrite(INT_LED, LOW);
-  digitalWrite(RELAY_CHRG_PIN, LOW); // Switch CHARGER ON
   digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
 
   lastAcValue = now;
@@ -115,9 +114,14 @@ void onLineOn() {
 
   minBatteryLevel = 10000;
   maxBatteryLevel = 0;
-  batteryChargerActive = true;
+  set_battery_charger(true);
+}
+
+void set_battery_charger(bool state) {
   lastChargerUpdateMs = now;
-  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", "1");
+  batteryChargerActive = state;
+  digitalWrite(RELAY_CHRG_PIN, state ? LOW : HIGH); // LOW = ON
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", state ? "1" : "0");
 }
 
 void battery_charger_loop() {
@@ -134,14 +138,12 @@ void battery_charger_loop() {
     lastChargerUpdateMs = now;
 
     if (maxBatteryLevel < 7350 && !batteryChargerActive) {
-      batteryChargerActive = true;
-      digitalWrite(RELAY_CHRG_PIN, LOW); // Switch CHARGER ON
+      set_battery_charger(true);
     }
     else if (batteryChargerActive) {
       if (std::abs((int)(lastMaxBatteryLevel - maxBatteryLevel)) < 10) {
         lastMaxBatteryLevel = 0;
-        batteryChargerActive = false;
-        digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+        set_battery_charger(false);
       }
       else {
         lastMaxBatteryLevel = maxBatteryLevel;
