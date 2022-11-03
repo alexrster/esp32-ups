@@ -10,6 +10,8 @@
             "includePath": [
                 "/Users/a/Projects/esp32-ups/include",
                 "/Users/a/Projects/esp32-ups/src",
+                "/Users/a/Projects/esp32-ups/lib/wifi-mqtt/src",
+                "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/Users/a/Projects/esp32-ups/.pio/libdeps/debug/PubSubClient/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s2/include/newlib/platform_include",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s2/include/freertos/include",
@@ -213,7 +215,6 @@
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
-                "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                 "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
@@ -224,6 +225,8 @@
                 "path": [
                     "/Users/a/Projects/esp32-ups/include",
                     "/Users/a/Projects/esp32-ups/src",
+                    "/Users/a/Projects/esp32-ups/lib/wifi-mqtt/src",
+                    "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/Users/a/Projects/esp32-ups/.pio/libdeps/debug/PubSubClient/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s2/include/newlib/platform_include",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s2/include/freertos/include",
@@ -427,7 +430,6 @@
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
-                    "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                     "/Users/a/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",

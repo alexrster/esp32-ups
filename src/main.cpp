@@ -1,32 +1,27 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>
+#include <wifi-mqtt.h>
+#include <ArduinoOTA.h>
 
-#define WIFI_RECONNECT_MILLIS         10000
-#define WIFI_WATCHDOG_MILLIS          60000
-
-#ifndef WIFI_HOSTNAME
-#define WIFI_HOSTNAME                 "esp32-ups-01"
-#endif
-
-#define MQTT_SERVER_NAME              "10.9.9.96"
-#define MQTT_SERVER_PORT              1883
-#define MQTT_USERNAME                 NULL
-#define MQTT_PASSWORD                 NULL
-#define MQTT_RECONNECT_MILLIS         5000
-
-#ifndef MQTT_CLIENT_ID
-#define MQTT_CLIENT_ID                WIFI_HOSTNAME
-#endif
+#define WIFI_SSID                     "qx.zone"
+#define WIFI_PASSPHRASE               "1234Qwer-"
 
 #define INT_LED                       15
 
+#define BATTERY_VOLTAGE_UPDATE_MS     5000
+
 #define AC_DETECTOR_PIN               4
-#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2    // allow to miss 1 from 2 zero crosses @50Hz
+#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
 //                                     ms     Hz   crosses
 #define BATTERY_MODE_MIN_MS           3000
 
 #define RELAY_INV_PIN                 16
 #define RELAY_CHRG_PIN                17
+#define BATTERY_VOLTAGE_PIN           2
+#define H35_SCL                       35
+#define H35_SDA                       33
+#define H36_PIN1                      13
+#define H36_PIN2                      14
 
 typedef enum : uint8_t {
   LINE = 0,
@@ -36,8 +31,12 @@ typedef enum : uint8_t {
 unsigned long 
   now = 0,
   lastAcValue = 0,
+  lastBatteryVoltageReadMs = 0,
   lastModeChangeMs = 0,
   zc = 0;
+
+uint16_t
+  batteryLevel = 0;
 
 ups_mode_t 
   current_mode = LINE;
@@ -45,6 +44,12 @@ ups_mode_t
 void IRAM_ATTR acDetectorISR() {
   zc++;
   lastAcValue = now;
+}
+
+void on_ota_begin() {
+  if (current_mode != LINE) {
+
+  }
 }
 
 void ac_setup() {
@@ -56,11 +61,20 @@ void setup() {
   pinMode(RELAY_INV_PIN, OUTPUT_OPEN_DRAIN);
   pinMode(RELAY_CHRG_PIN, OUTPUT_OPEN_DRAIN);
   pinMode(INT_LED, OUTPUT);
+  pinMode(BATTERY_VOLTAGE_PIN, INPUT);
 
   digitalWrite(RELAY_INV_PIN, HIGH);
   digitalWrite(RELAY_CHRG_PIN, HIGH);
 
   ac_setup();
+  log_i("AC DETECTOR SETUP COMPLETE!");
+
+  wifi_setup();
+  log_i("WIFI SETUP COMPLETE!");
+
+  ArduinoOTA.begin();
+  log_i("ARDUINO-OTA SETUP COMPLETE!");
+
   log_i("SETUP COMPLETE!");
 
   // digitalWrite(INT_LED, HIGH);
@@ -86,6 +100,8 @@ void onLineOff() {
   digitalWrite(INT_LED, HIGH);
   digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
   digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
+
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
 }
 
 void onLineOn() {
@@ -99,6 +115,8 @@ void onLineOn() {
   lastAcValue = now;
   delay(200);
   lastAcValue = now;
+
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
 }
 
 void ac_loop() {
@@ -111,8 +129,8 @@ void ac_loop() {
     }
 
     // auto value = zc;
-    // pubSubClient.publish(MQTT_CLIENT_ID "/ac/count", String(value).c_str());
-    // pubSubClient.publish(MQTT_CLIENT_ID "/ac/millis", String(now - lastAcPublish).c_str());
+    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/count", String(value).c_str());
+    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/millis", String(now - lastAcPublish).c_str());
   } else {
     zc = 0;
 
@@ -125,11 +143,26 @@ void ac_loop() {
   }
 }
 
+void battery_voltage_loop() {
+  if (now - lastBatteryVoltageReadMs > BATTERY_VOLTAGE_UPDATE_MS) {
+    lastBatteryVoltageReadMs = now;
+
+    batteryLevel = analogRead(BATTERY_VOLTAGE_PIN);
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/battery/raw", String(batteryLevel).c_str());
+  }
+}
+
 void loop() {
   esp_task_wdt_reset();
 
   now = millis();
   ac_loop();
+  battery_voltage_loop();
+  if (wifi_loop(now)) {
+    if (current_mode == LINE) {
+      ArduinoOTA.handle();
+    }
+  }
 
   delay(1);
 }
