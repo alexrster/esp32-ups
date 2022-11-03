@@ -1,8 +1,6 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
-#define WIFI_SSID                     "qx.zone"
-#define WIFI_PASSPHRASE               "1234Qwer-"
 #define WIFI_RECONNECT_MILLIS         10000
 #define WIFI_WATCHDOG_MILLIS          60000
 
@@ -23,8 +21,9 @@
 #define INT_LED                       15
 
 #define AC_DETECTOR_PIN               4
-#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2 + 3    // allow to miss 2 zero crosses @50Hz, +3ms
+#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2    // allow to miss 1 from 2 zero crosses @50Hz
 //                                     ms     Hz   crosses
+#define BATTERY_MODE_MIN_MS           3000
 
 #define RELAY_INV_PIN                 16
 #define RELAY_CHRG_PIN                17
@@ -37,6 +36,7 @@ typedef enum : uint8_t {
 unsigned long 
   now = 0,
   lastAcValue = 0,
+  lastModeChangeMs = 0,
   zc = 0;
 
 ups_mode_t 
@@ -78,16 +78,36 @@ void setup() {
   // digitalWrite(INT_LED, LOW);
 }
 
+void onLineOff() {
+  log_i("ELECTRICITY CUT OFF! Switching to Battery mode!");
+  current_mode = BATTERY;
+  lastModeChangeMs = now;
+
+  digitalWrite(INT_LED, HIGH);
+  digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+  digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
+}
+
+void onLineOn() {
+  log_i("ELECTRICITY RESTORED! Switching to Line mode!");
+  current_mode = LINE;
+  lastModeChangeMs = now;
+
+  digitalWrite(INT_LED, LOW);
+  // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+  digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
+  lastAcValue = now;
+  delay(200);
+  lastAcValue = now;
+}
+
 void ac_loop() {
   if (now - lastAcValue > AC_DETECTOR_TIMEOUT_MS && zc == 0) {
     if (current_mode == LINE) {
-      // ELECTRICITY CUT OFF CASE!!!
-      log_i("ELECTRICITY CUT OFF! Switching to Battery mode!");
-      current_mode = BATTERY;
-
-      digitalWrite(INT_LED, HIGH);
-      digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
-      digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
+      // ELECTRICITY CUT OFF
+      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
+        onLineOff();
+      }
     }
 
     // auto value = zc;
@@ -95,13 +115,12 @@ void ac_loop() {
     // pubSubClient.publish(MQTT_CLIENT_ID "/ac/millis", String(now - lastAcPublish).c_str());
   } else {
     zc = 0;
-    if (current_mode == BATTERY) {
-      log_i("ELECTRICITY RESTORED! Switching to Line mode!");
-      current_mode = LINE;
 
-      digitalWrite(INT_LED, LOW);
-      // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
-      digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
+    if (current_mode == BATTERY) {
+      // ELECTRICITY RESUMED
+      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
+        onLineOn();
+      }
     }
   }
 }
