@@ -35,11 +35,18 @@ unsigned long
   lastAcValue = 0,
   lastBatteryVoltageReadMs = 0,
   lastBatteryVoltageUpdateMs = 0,
+  lastChargerStatsUpdateMs = 0,
+  lastChargerUpdateMs = 0,
   lastModeChangeMs = 0,
   zc = 0;
 
+bool
+  batteryChargerActive = true;
+
 uint16_t
-  batteryLevel = 0;
+  batteryLevel = 0,
+  maxBatteryLevel = 0,
+  minBatteryLevel = 0;
 
 ups_mode_t 
   current_mode = LINE;
@@ -47,12 +54,6 @@ ups_mode_t
 void IRAM_ATTR acDetectorISR() {
   zc++;
   lastAcValue = now;
-}
-
-void on_ota_begin() {
-  if (current_mode != LINE) {
-
-  }
 }
 
 void ac_setup() {
@@ -85,11 +86,13 @@ void onLineOff() {
   log_i("ELECTRICITY CUT OFF! Switching to Battery mode!");
   current_mode = BATTERY;
   lastModeChangeMs = now;
+  batteryChargerActive = false;
 
   digitalWrite(INT_LED, HIGH);
   digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
   digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
 
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", "0");
   pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
 }
 
@@ -99,7 +102,7 @@ void onLineOn() {
   lastModeChangeMs = now;
 
   digitalWrite(INT_LED, LOW);
-  // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+  digitalWrite(RELAY_CHRG_PIN, LOW); // Switch CHARGER ON
   digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
 
   lastAcValue = now;
@@ -107,6 +110,43 @@ void onLineOn() {
   lastAcValue = now;
 
   pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
+
+  minBatteryLevel = 0;
+  maxBatteryLevel = 0;
+  batteryChargerActive = true;
+  lastChargerUpdateMs = now;
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", "1");
+}
+
+void battery_charge_loop() {
+  if (current_mode == BATTERY) return;
+
+  if (now - lastChargerStatsUpdateMs > 1000) {
+    lastChargerStatsUpdateMs = now;
+
+    maxBatteryLevel = batteryLevel < maxBatteryLevel ? maxBatteryLevel : batteryLevel;
+    minBatteryLevel = batteryLevel > minBatteryLevel ? minBatteryLevel : batteryLevel;
+  }
+
+  if (now - lastChargerUpdateMs > 90000) {
+    lastChargerUpdateMs = now;
+
+    if (maxBatteryLevel < 7350 && !batteryChargerActive) {
+      batteryChargerActive = true;
+      digitalWrite(RELAY_CHRG_PIN, LOW); // Switch CHARGER ON
+    }
+    else if (maxBatteryLevel > 7660 && maxBatteryLevel - minBatteryLevel < 250 && batteryChargerActive) {
+      batteryChargerActive = false;
+      digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+    }
+
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/min_raw", String(minBatteryLevel).c_str());
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/max_raw", String(maxBatteryLevel).c_str());
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", batteryChargerActive ? "1" : "0");
+
+    maxBatteryLevel = 0;
+    minBatteryLevel = 0;
+  }
 }
 
 void ac_loop() {
@@ -146,6 +186,7 @@ void loop() {
 
   ac_loop();
   battery_voltage_loop();
+  battery_charge_loop();
 
   if (wifi_loop(now)) {
     if (current_mode == LINE) {
