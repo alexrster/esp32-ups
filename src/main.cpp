@@ -13,7 +13,7 @@
 #define AC_DETECTOR_PIN               4
 #define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
 //                                     ms     Hz   crosses
-#define BATTERY_MODE_MIN_MS           3000
+#define MODE_CHANGE_MIN_DELAY_MS      3000
 
 #define RELAY_INV_PIN                 16
 #define RELAY_CHRG_PIN                17
@@ -76,20 +76,6 @@ void setup() {
   log_i("ARDUINO-OTA SETUP COMPLETE!");
 
   log_i("SETUP COMPLETE!");
-
-  // digitalWrite(INT_LED, HIGH);
-  // digitalWrite(RELAY_INV_PIN, LOW);
-  // digitalWrite(RELAY_CHRG_PIN, LOW);
-  // delay(1000);
-  // digitalWrite(INT_LED, LOW);
-  // digitalWrite(RELAY_INV_PIN, HIGH);
-  // digitalWrite(RELAY_CHRG_PIN, HIGH);
-  // delay(1000);
-  // digitalWrite(INT_LED, HIGH);
-  // digitalWrite(RELAY_INV_PIN, LOW);
-  // digitalWrite(RELAY_CHRG_PIN, LOW);
-  // delay(500);
-  // digitalWrite(INT_LED, LOW);
 }
 
 void onLineOff() {
@@ -112,6 +98,7 @@ void onLineOn() {
   digitalWrite(INT_LED, LOW);
   // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
   digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
+
   lastAcValue = now;
   delay(200);
   lastAcValue = now;
@@ -120,25 +107,18 @@ void onLineOn() {
 }
 
 void ac_loop() {
+  // ELECTRICITY CUT OFF
   if (now - lastAcValue > AC_DETECTOR_TIMEOUT_MS && zc == 0) {
-    if (current_mode == LINE) {
-      // ELECTRICITY CUT OFF
-      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
-        onLineOff();
-      }
+    if (current_mode == LINE && now - lastModeChangeMs > MODE_CHANGE_MIN_DELAY_MS) {
+      onLineOff();
     }
+  } 
 
-    // auto value = zc;
-    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/count", String(value).c_str());
-    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/millis", String(now - lastAcPublish).c_str());
-  } else {
+  // ELECTRICITY RESUMED
+  else {
     zc = 0;
-
-    if (current_mode == BATTERY) {
-      // ELECTRICITY RESUMED
-      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
-        onLineOn();
-      }
+    if (current_mode == BATTERY && now - lastModeChangeMs > MODE_CHANGE_MIN_DELAY_MS) {
+      onLineOn();
     }
   }
 }
@@ -149,15 +129,17 @@ void battery_voltage_loop() {
 
     batteryLevel = analogRead(BATTERY_VOLTAGE_PIN);
     pubSubClient.publish(MQTT_TOPIC_PREFIX "/battery/raw", String(batteryLevel).c_str());
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", current_mode == LINE ? "line" : "battery");
   }
 }
 
 void loop() {
   esp_task_wdt_reset();
-
   now = millis();
+
   ac_loop();
   battery_voltage_loop();
+
   if (wifi_loop(now)) {
     if (current_mode == LINE) {
       ArduinoOTA.handle();
