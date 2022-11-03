@@ -13,6 +13,7 @@
 #define AC_DETECTOR_PIN               4
 #define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
 //                                     ms     Hz   crosses
+#define BATTERY_MODE_MIN_MS           3000
 
 #define RELAY_INV_PIN                 16
 #define RELAY_CHRG_PIN                17
@@ -31,6 +32,7 @@ unsigned long
   now = 0,
   lastAcValue = 0,
   lastBatteryVoltageReadMs = 0,
+  lastModeChangeMs = 0,
   zc = 0;
 
 uint16_t
@@ -90,18 +92,40 @@ void setup() {
   // digitalWrite(INT_LED, LOW);
 }
 
+void onLineOff() {
+  log_i("ELECTRICITY CUT OFF! Switching to Battery mode!");
+  current_mode = BATTERY;
+  lastModeChangeMs = now;
+
+  digitalWrite(INT_LED, HIGH);
+  digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+  digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
+
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
+}
+
+void onLineOn() {
+  log_i("ELECTRICITY RESTORED! Switching to Line mode!");
+  current_mode = LINE;
+  lastModeChangeMs = now;
+
+  digitalWrite(INT_LED, LOW);
+  // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+  digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
+  lastAcValue = now;
+  delay(200);
+  lastAcValue = now;
+
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
+}
+
 void ac_loop() {
   if (now - lastAcValue > AC_DETECTOR_TIMEOUT_MS && zc == 0) {
     if (current_mode == LINE) {
-      // ELECTRICITY CUT OFF CASE!!!
-      log_i("ELECTRICITY CUT OFF! Switching to Battery mode!");
-      current_mode = BATTERY;
-
-      digitalWrite(INT_LED, HIGH);
-      digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
-      digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
-
-      pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
+      // ELECTRICITY CUT OFF
+      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
+        onLineOff();
+      }
     }
 
     // auto value = zc;
@@ -109,15 +133,12 @@ void ac_loop() {
     // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/millis", String(now - lastAcPublish).c_str());
   } else {
     zc = 0;
+
     if (current_mode == BATTERY) {
-      log_i("ELECTRICITY RESTORED! Switching to Line mode!");
-      current_mode = LINE;
-
-      digitalWrite(INT_LED, LOW);
-      // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
-      digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
-
-      pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
+      // ELECTRICITY RESUMED
+      if (now - lastModeChangeMs > BATTERY_MODE_MIN_MS) {
+        onLineOn();
+      }
     }
   }
 }
