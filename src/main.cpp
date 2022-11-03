@@ -11,7 +11,7 @@
 #define BATTERY_VOLTAGE_UPDATE_MS     5000
 
 #define AC_DETECTOR_PIN               4
-#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2 + 3    // allow to miss 2 zero crosses @50Hz, +3ms
+#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
 //                                     ms     Hz   crosses
 
 #define RELAY_INV_PIN                 16
@@ -101,12 +101,12 @@ void ac_loop() {
       digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
       digitalWrite(RELAY_INV_PIN, LOW); // Switch INVERTER ON
 
-      pubSubClient.publish(MQTT_CLIENT_ID "/mode", "battery");
+      pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "battery");
     }
 
     // auto value = zc;
-    // pubSubClient.publish(MQTT_CLIENT_ID "/ac/count", String(value).c_str());
-    // pubSubClient.publish(MQTT_CLIENT_ID "/ac/millis", String(now - lastAcPublish).c_str());
+    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/count", String(value).c_str());
+    // pubSubClient.publish(MQTT_TOPIC_PREFIX "/ac/millis", String(now - lastAcPublish).c_str());
   } else {
     zc = 0;
     if (current_mode == BATTERY) {
@@ -117,7 +117,7 @@ void ac_loop() {
       // digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
       digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
 
-      pubSubClient.publish(MQTT_CLIENT_ID "/mode", "line");
+      pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
     }
   }
 }
@@ -127,7 +127,7 @@ void battery_voltage_loop() {
     lastBatteryVoltageReadMs = now;
 
     batteryLevel = analogRead(BATTERY_VOLTAGE_PIN);
-    pubSubClient.publish(MQTT_CLIENT_ID "/battery/raw", String(batteryLevel).c_str());
+    pubSubClient.publish(MQTT_TOPIC_PREFIX "/battery/raw", String(batteryLevel).c_str());
   }
 }
 

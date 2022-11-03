@@ -21,8 +21,9 @@
 #define MQTT_CLIENT_ID                WIFI_HOSTNAME
 #endif
 
-#define MQTT_STATUS_TOPIC             MQTT_CLIENT_ID "/status"
-#define MQTT_VERSION_TOPIC            MQTT_CLIENT_ID "/version"
+#define MQTT_TOPIC_PREFIX             "dev/" MQTT_CLIENT_ID
+#define MQTT_STATUS_TOPIC             MQTT_TOPIC_PREFIX "/status"
+#define MQTT_VERSION_TOPIC            MQTT_TOPIC_PREFIX "/version"
 #define MQTT_STATUS_ONLINE_MSG        "online"
 #define MQTT_STATUS_OFFLINE_MSG       "offline"
 
