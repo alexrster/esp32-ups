@@ -47,7 +47,8 @@ bool
 uint16_t
   batteryLevel = 0,
   maxBatteryLevel = 0,
-  minBatteryLevel = 10000;
+  minBatteryLevel = 10000,
+  lastMaxBatteryLevel = 0;
 
 ups_mode_t 
   current_mode = LINE;
@@ -136,9 +137,15 @@ void battery_charger_loop() {
       batteryChargerActive = true;
       digitalWrite(RELAY_CHRG_PIN, LOW); // Switch CHARGER ON
     }
-    else if (maxBatteryLevel > 7660 && maxBatteryLevel - minBatteryLevel < 250 && batteryChargerActive) {
-      batteryChargerActive = false;
-      digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+    else if (batteryChargerActive) {
+      if (std::abs((int)(lastMaxBatteryLevel - maxBatteryLevel)) < 10) {
+        lastMaxBatteryLevel = 0;
+        batteryChargerActive = false;
+        digitalWrite(RELAY_CHRG_PIN, HIGH); // Switch CHARGER OFF
+      }
+      else {
+        lastMaxBatteryLevel = maxBatteryLevel;
+      }
     }
 
     pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/min_raw", String(minBatteryLevel).c_str());
