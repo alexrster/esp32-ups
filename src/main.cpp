@@ -41,12 +41,13 @@ unsigned long
   zc = 0;
 
 bool
+  wifiConnected = false,
   batteryChargerActive = true;
 
 uint16_t
   batteryLevel = 0,
   maxBatteryLevel = 0,
-  minBatteryLevel = 0;
+  minBatteryLevel = 10000;
 
 ups_mode_t 
   current_mode = LINE;
@@ -111,14 +112,14 @@ void onLineOn() {
 
   pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", "line");
 
-  minBatteryLevel = 0;
+  minBatteryLevel = 10000;
   maxBatteryLevel = 0;
   batteryChargerActive = true;
   lastChargerUpdateMs = now;
   pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", "1");
 }
 
-void battery_charge_loop() {
+void battery_charger_loop() {
   if (current_mode == BATTERY) return;
 
   if (now - lastChargerStatsUpdateMs > 1000) {
@@ -145,7 +146,7 @@ void battery_charge_loop() {
     pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", batteryChargerActive ? "1" : "0");
 
     maxBatteryLevel = 0;
-    minBatteryLevel = 0;
+    minBatteryLevel = 10000;
   }
 }
 
@@ -180,15 +181,27 @@ void battery_voltage_loop() {
   }
 }
 
+void on_wifi_reconnect() {
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/mode", current_mode == LINE ? "line" : "battery");
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", batteryChargerActive ? "1" : "0");
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/wifi/connected_ms", String(now).c_str());
+}
+
 void loop() {
   esp_task_wdt_reset();
   now = millis();
 
   ac_loop();
   battery_voltage_loop();
-  battery_charge_loop();
+  battery_charger_loop();
 
-  if (wifi_loop(now)) {
+  bool wifiPrevConnected = wifiConnected;
+  wifiConnected = wifi_loop(now);
+  if (wifiConnected) {
+    if (!wifiPrevConnected) {
+      on_wifi_reconnect();
+    }
+
     if (current_mode == LINE) {
       ArduinoOTA.handle();
     }
