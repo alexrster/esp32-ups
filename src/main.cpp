@@ -140,8 +140,8 @@ void battery_charger_loop() {
     if (maxBatteryLevel < 7350 && !batteryChargerActive) {
       set_battery_charger(true);
     }
-    else if (maxBatteryLevel > 7350 && batteryChargerActive) {
-      if (std::abs((int)(lastMaxBatteryLevel - maxBatteryLevel)) < 10) {
+    else if (maxBatteryLevel > 7660 && batteryChargerActive) {
+      if (std::abs((int)(lastMaxBatteryLevel - maxBatteryLevel)) < 10 && maxBatteryLevel - minBatteryLevel < 100) {
         lastMaxBatteryLevel = 0;
         set_battery_charger(false);
       }
