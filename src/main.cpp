@@ -12,7 +12,7 @@
 #define BATTERY_VOLTAGE_READ_MS       500
 
 #define AC_DETECTOR_PIN               4
-#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2     // allow to miss 2 zero crosses @50Hz
+#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2 + 5     // allow to miss 2 zero crosses @50Hz, +5ms
 //                                     ms     Hz   crosses
 #define MODE_CHANGE_MIN_DELAY_MS      3000
 
@@ -56,6 +56,13 @@ ups_mode_t
 void IRAM_ATTR acDetectorISR() {
   zc++;
   lastAcValue = now;
+}
+
+void set_battery_charger(bool state) {
+  lastChargerUpdateMs = now;
+  batteryChargerActive = state;
+  digitalWrite(RELAY_CHRG_PIN, state ? HIGH : LOW); // HIGH = ON
+  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", state ? "1" : "0");
 }
 
 void ac_setup() {
@@ -117,13 +124,6 @@ void onLineOn() {
   set_battery_charger(true);
 }
 
-void set_battery_charger(bool state) {
-  lastChargerUpdateMs = now;
-  batteryChargerActive = state;
-  digitalWrite(RELAY_CHRG_PIN, state ? LOW : HIGH); // LOW = ON
-  pubSubClient.publish(MQTT_TOPIC_PREFIX "/charger/active", state ? "1" : "0");
-}
-
 void battery_charger_loop() {
   if (current_mode == BATTERY) return;
 
@@ -140,7 +140,7 @@ void battery_charger_loop() {
     if (maxBatteryLevel < 7350 && !batteryChargerActive) {
       set_battery_charger(true);
     }
-    else if (batteryChargerActive) {
+    else if (maxBatteryLevel > 7350 && batteryChargerActive) {
       if (std::abs((int)(lastMaxBatteryLevel - maxBatteryLevel)) < 10) {
         lastMaxBatteryLevel = 0;
         set_battery_charger(false);
