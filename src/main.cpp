@@ -3,17 +3,15 @@
 #include <wifi-mqtt.h>
 #include <ArduinoOTA.h>
 
-#define WIFI_SSID                     "qx.zone"
-#define WIFI_PASSPHRASE               "1234Qwer-"
-
 #define INT_LED                       15
 
 #define BATTERY_VOLTAGE_UPDATE_MS     5000
 #define BATTERY_VOLTAGE_READ_MS       500
 
 #define AC_DETECTOR_PIN               4
-#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2 + 5     // allow to miss 2 zero crosses @50Hz, +5ms
-//                                     ms     Hz   crosses
+// #define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 2 + 5       // allow to miss 2 zero crosses @50Hz, +5ms
+#define AC_DETECTOR_TIMEOUT_MS        (1000 / 50 / 2) * 3     +    5   // allow to miss 3 zero crosses @50Hz, +5ms
+                                   // |ms    |Hz       |crosses   |ms
 #define MODE_CHANGE_MIN_DELAY_MS      3000
 
 #define RELAY_INV_PIN                 16
@@ -76,8 +74,8 @@ void setup() {
   pinMode(INT_LED, OUTPUT);
   pinMode(BATTERY_VOLTAGE_PIN, INPUT);
 
-  digitalWrite(RELAY_INV_PIN, HIGH);
-  digitalWrite(RELAY_CHRG_PIN, HIGH);
+  digitalWrite(RELAY_INV_PIN, HIGH);   // INVERTER OFF
+  digitalWrite(RELAY_CHRG_PIN, HIGH);  // CHARGER OFF
 
   ac_setup();
   log_i("AC DETECTOR SETUP COMPLETE!");
@@ -170,7 +168,7 @@ void ac_loop() {
   // ELECTRICITY RESUMED
   else {
     zc = 0;
-    if (current_mode == BATTERY && now - lastModeChangeMs > MODE_CHANGE_MIN_DELAY_MS) {
+    if (current_mode == BATTERY && now - lastModeChangeMs > MODE_CHANGE_MIN_DELAY_MS * 5) {
       onLineOn();
     }
   }
