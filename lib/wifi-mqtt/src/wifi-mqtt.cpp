@@ -1,7 +1,31 @@
 #include "wifi-mqtt.h"
+#include <queue>
+#include <list>
+
+typedef struct message_t {
+  String topic;
+  String payload;
+  bool retained;
+
+  message_t(const char* topic, const char* payload, boolean retained) 
+    : topic(topic), payload(payload), retained(retained)
+  { }
+};
+
+typedef struct topic_subscription_t {
+  String topic;
+  message_handler_t handler;
+
+  topic_subscription_t(const char* topic, message_handler_t handler)
+    : topic(topic), handler(handler)
+  { }
+};
 
 WiFiClient wifiClient;
 PubSubClient pubSubClient(wifiClient);
+
+std::queue<message_t> messageQueue;
+std::list<topic_subscription_t> topicSubscriptions;
 
 unsigned long 
   lastWifiReconnect = 0,
@@ -18,6 +42,10 @@ bool reconnectPubSub(unsigned long now) {
 #ifdef VERSION
       pubSubClient.publish(MQTT_VERSION_TOPIC, VERSION, true);
 #endif
+
+      for (auto s : topicSubscriptions) {
+        pubSubClient.subscribe(s.topic.c_str(), 0);
+      }
     }
     
     return pubSubClient.connected();
@@ -55,7 +83,15 @@ bool wifi_loop(unsigned long now) {
   lastWifiReconnect = now;
   lastWifiOnline = now;
   
-  return mqtt_loop(now);
+  return pubsub_queue_publish() && mqtt_loop(now);
+}
+
+void mqtt_on_message(char* topic, uint8_t* payload, unsigned int length) {
+  for (auto s : topicSubscriptions) {
+    if (s.topic.equals(topic)) {
+      s.handler(payload, length);
+    }
+  }
 }
 
 void wifi_setup() {
@@ -66,4 +102,28 @@ void wifi_setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSPHRASE);
 
   pubSubClient.setServer(MQTT_SERVER_NAME, MQTT_SERVER_PORT);
+  pubSubClient.setCallback(mqtt_on_message);
+}
+
+bool pubsub_queue_message(const char* topic, const char* payload, boolean retained) {
+  if (messageQueue.size() >= MQTT_QUEUE_MAX_SIZE) return false;
+
+  messageQueue.push(message_t(topic, payload, retained));
+  return true;
+}
+
+bool pubsub_queue_publish() {
+  bool result = true;
+  while (!messageQueue.empty()) {
+    auto m = messageQueue.front();
+    messageQueue.pop();
+
+    result &= pubSubClient.publish(m.topic.c_str(), m.payload.c_str(), m.retained);
+  }
+
+  return result;
+}
+
+void pubsub_subscribe(const char* topic, message_handler_t handler) {
+  topicSubscriptions.push_back(topic_subscription_t(topic, handler));
 }
