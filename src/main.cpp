@@ -27,7 +27,7 @@
 
 // #define INT_LED_PIN                   15 // IT CONFLICTS WITH TEMPERATURE (DS18B20) SENSORS -- DO NOT USE IT!!!
 
-#define TSENSORS_READ_MS              2000
+#define TSENSORS_READ_MS              10000
 #define TSENSORS_COUNT                3
 
 const uint8_t tSensor_ids[TSENSORS_COUNT][8] = {

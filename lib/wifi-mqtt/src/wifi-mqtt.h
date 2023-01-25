@@ -39,5 +39,6 @@ bool wifi_loop(unsigned long now);
 bool pubsub_queue_message(const char* topic, const char* payload, boolean retained = false);
 bool pubsub_queue_publish();
 void pubsub_subscribe(const char* topic, message_handler_t handler);
+void pubsub_subscribe(const char* topic, uint8_t qos, message_handler_t handler);
 
 #endif

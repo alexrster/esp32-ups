@@ -2,7 +2,7 @@
 #include <queue>
 #include <list>
 
-typedef struct message_t {
+struct message_t {
   String topic;
   String payload;
   bool retained;
@@ -12,12 +12,17 @@ typedef struct message_t {
   { }
 };
 
-typedef struct topic_subscription_t {
+struct topic_subscription_t {
   String topic;
+  uint8_t qos;
   message_handler_t handler;
 
+  topic_subscription_t(const char* topic, uint8_t qos, message_handler_t handler)
+    : topic(topic), qos(qos), handler(handler)
+  { }
+
   topic_subscription_t(const char* topic, message_handler_t handler)
-    : topic(topic), handler(handler)
+    : topic(topic), qos(0), handler(handler)
   { }
 };
 
@@ -44,7 +49,7 @@ bool reconnectPubSub(unsigned long now) {
 #endif
 
       for (auto s : topicSubscriptions) {
-        pubSubClient.subscribe(s.topic.c_str(), 0);
+        pubSubClient.subscribe(s.topic.c_str(), s.qos);
       }
     }
     
@@ -87,7 +92,7 @@ bool wifi_loop(unsigned long now) {
 }
 
 void mqtt_on_message(char* topic, uint8_t* payload, unsigned int length) {
-  for (auto s : topicSubscriptions) {
+  for (auto& s : topicSubscriptions) {
     if (s.topic.equals(topic)) {
       s.handler(payload, length);
     }
@@ -122,6 +127,10 @@ bool pubsub_queue_publish() {
   }
 
   return result;
+}
+
+void pubsub_subscribe(const char* topic, uint8_t qos, message_handler_t handler) {
+  topicSubscriptions.push_back(topic_subscription_t(topic, qos, handler));
 }
 
 void pubsub_subscribe(const char* topic, message_handler_t handler) {
