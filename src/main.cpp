@@ -52,7 +52,8 @@ unsigned long
   lastModeChangeMs = 0,
   lastTSensorsReadMs = 0,
   lastAcPeriodPublishMs = 10000,
-  acPeriodMs = 0,
+  lastModeBatteryMs = 0,
+  lastModeLineMs = 0,
   zc = 0;
 
 bool
@@ -105,9 +106,6 @@ void onLineOn() {
   digitalWrite(RELAY_INV_PIN, HIGH); // Switch INVERTER OFF
 
   lastAcValue = millis();
-  delay(200);
-  lastAcValue = millis();
-
   pubsub_queue_message(MQTT_TOPIC_PREFIX "/mode", "line");
 
   minBatteryLevel = 10000;
@@ -154,7 +152,10 @@ void ac_loop() {
   auto n = millis();
   // ELECTRICITY CUT OFF
   if (n - lastAcValue > AC_DETECTOR_TIMEOUT_MS && zc == 0) {
-    acPeriodMs = 0;
+    if (current_mode == BATTERY) {
+      lastModeBatteryMs = n;
+    }
+
     if (current_mode == LINE && n - lastModeChangeMs > MODE_CHANGE_TO_BATTERY_MS) {
       onLineOff();
     }
@@ -163,8 +164,11 @@ void ac_loop() {
   // ELECTRICITY RESUMED
   else {
     zc = 0;
-    acPeriodMs = (acPeriodMs + (n - lastModeChangeMs)) / 2;
-    if (current_mode == BATTERY && n - lastModeChangeMs > MODE_CHANGE_TO_LINE_MS) {
+    if (current_mode == LINE) {
+      lastModeLineMs = n;
+    }
+
+    if (current_mode == BATTERY && n - lastModeChangeMs > MODE_CHANGE_TO_LINE_MS && n - lastModeBatteryMs > MODE_CHANGE_TO_LINE_MS) {
       onLineOn();
     }
   }
