@@ -154,9 +154,7 @@ void ac_loop() {
   if (n - lastAcValue > AC_DETECTOR_TIMEOUT_MS && zc == 0) {
     if (current_mode == BATTERY) {
       lastModeBatteryMs = n;
-    }
-
-    if (current_mode == LINE && n - lastModeChangeMs > MODE_CHANGE_TO_BATTERY_MS) {
+    } else if (current_mode == LINE) {
       onLineOff();
     }
   } 
