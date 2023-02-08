@@ -43,6 +43,7 @@ bool reconnectPubSub(unsigned long now) {
 
     if (pubSubClient.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD, MQTT_STATUS_TOPIC, MQTTQOS0, true, MQTT_STATUS_OFFLINE_MSG, true)) {
       pubSubClient.publish(MQTT_STATUS_TOPIC, MQTT_STATUS_ONLINE_MSG, true);
+      pubSubClient.publish(MQTT_IPADDRESS_TOPIC, WiFi.localIP().toString().c_str(), true);
 
 #ifdef VERSION
       pubSubClient.publish(MQTT_VERSION_TOPIC, VERSION, true);
