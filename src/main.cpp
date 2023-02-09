@@ -75,8 +75,9 @@ ups_mode_t
   current_mode = LINE;
 
 SwitchRelayPin
-  swLanPower(RELAY_19_5V_PIN, LOW, OUTPUT_OPEN_DRAIN),
-  swStarlinkPower(RELAY_48V_PIN, LOW, OUTPUT_OPEN_DRAIN);
+  swLanPower(RELAY_19_5V_PIN, HIGH, OUTPUT),
+  swStarlinkPower(RELAY_48V_PIN, HIGH, OUTPUT),
+  swRelayC(18, HIGH, OUTPUT);
 
 OneWire oneWireBus(DS18B20_PIN);
 DallasTemperature tSensors(&oneWireBus);
@@ -303,7 +304,8 @@ void setup() {
   pinMode(BATTERY_VOLTAGE_PIN, INPUT);
 
   swLanPower.setOn();
-  swStarlinkPower.setOff();
+  swStarlinkPower.setOn();
+  swRelayC.setOn();
 
   ac_setup();
   log_i("AC DETECTOR SETUP COMPLETE!");
